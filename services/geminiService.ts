@@ -1,23 +1,17 @@
 
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { ModelType, AspectRatio, StoryGenerationResult, TitleData, ImageResolution } from "../types";
-import { getApiKey } from "../utils/keyStorage";
 
-// TypeScript에서 process를 인식하도록 전역 타입 보완
-declare const process: {
-  env: {
-    API_KEY?: string;
-  };
-};
+// @google/genai Coding Guidelines: Initialization must use process.env.API_KEY directly.
+// The getApiKey utility is removed to comply with exclusive environment variable usage.
 
 /**
  * AI Client Factory
  * 안전하게 API 키를 획득합니다.
  */
 const getAIClient = () => {
-  // 지침에 따라 process.env.API_KEY를 최우선으로 사용합니다.
-  const envKey = typeof process !== 'undefined' ? process.env?.API_KEY : null;
-  const apiKey = envKey || getApiKey();
+  // Use process.env.API_KEY directly as per guidelines
+  const apiKey = process.env.API_KEY;
   
   if (!apiKey) {
     throw new Error("API_KEY_MISSING: API 키를 설정하거나 프로젝트를 선택해주세요.");
@@ -32,7 +26,7 @@ const getAIClient = () => {
 export const translateToVeoPrompt = async (koreanInput: string, referenceImageBase64: string | null): Promise<{ english: string; korean: string }> => {
   const ai = getAIClient();
   
-  const schema: Schema = {
+  const schema = {
     type: Type.OBJECT,
     properties: {
       english: { type: Type.STRING, description: "Optimized English prompt for Google Veo 3" },
@@ -110,7 +104,7 @@ export const generateStoryStructure = async (
   const ai = getAIClient();
   const modelId = "gemini-3-pro-preview";
 
-  const sceneSchema: Schema = {
+  const sceneSchema = {
     type: Type.OBJECT,
     properties: {
       scenes: {
@@ -217,7 +211,7 @@ export const generateStoryStructure = async (
 
 export const generateTitles = async (topic: string): Promise<TitleData[]> => {
   const ai = getAIClient();
-  const titlesSchema: Schema = {
+  const titlesSchema = {
     type: Type.OBJECT,
     properties: {
       titles: {

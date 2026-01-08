@@ -2,18 +2,42 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { ModelType, AspectRatio, StoryGenerationResult, TitleData, ImageResolution } from "./types";
 
-declare const process: {
-  env: {
-    API_KEY?: string;
-  };
-};
-
-const getAIClient = () => {
-  const apiKey = process.env.API_KEY;
+/**
+ * AI Client Factory
+ * Checks for a manually entered key in localStorage first, 
+ * then falls back to the environment variable.
+ */
+const getAIClient = (overrideKey?: string) => {
+  const apiKey = overrideKey || localStorage.getItem('wt_api_key') || process.env.API_KEY;
   if (!apiKey) {
-    throw new Error("Requested entity was not found.");
+    throw new Error("API_KEY_MISSING");
   }
   return new GoogleGenAI({ apiKey });
+};
+
+/**
+ * Connection Test
+ * Validates the provided or stored API key.
+ */
+export const validateConnection = async (testKey?: string): Promise<{ success: boolean; message: string }> => {
+  try {
+    const ai = getAIClient(testKey);
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ parts: [{ text: "Connection test. Reply with 'OK'." }] }],
+    });
+    if (response.text) {
+      return { success: true, message: "Connection successful. Gemini is ready." };
+    }
+    return { success: false, message: "Received empty response from Gemini." };
+  } catch (error: any) {
+    console.error("Connection Validation Failed:", error);
+    let errorMsg = error?.message || "Unknown error occurred.";
+    if (errorMsg.includes("entity was not found") || errorMsg.includes("API_KEY_INVALID")) {
+      errorMsg = "유효하지 않은 API 키입니다. 다시 확인해주세요.";
+    }
+    return { success: false, message: errorMsg };
+  }
 };
 
 export const translateToVeoPrompt = async (koreanInput: string, referenceImageBase64: string | null): Promise<{ english: string; korean: string }> => {

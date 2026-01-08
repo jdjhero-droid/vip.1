@@ -6,7 +6,7 @@ import { ApiKeyModal } from './components/ApiKeyModal';
 import { HistoryPanel } from './components/HistoryPanel';
 import { ImageOverlay } from './components/ImageOverlay';
 import { ModelType, GeneratedScene, AspectRatio, TitleData, ImageResolution, HistoryItem } from './types';
-import { generateStoryStructure, generateSceneImage, generateTitles } from './geminiService';
+import { generateStoryStructure, generateSceneImage } from './geminiService';
 
 const App: React.FC = () => {
   const [topic, setTopic] = useState('');
@@ -23,7 +23,6 @@ const App: React.FC = () => {
   const [magicPrompt, setMagicPrompt] = useState<{ english: string; korean: string } | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isGeneratingStory, setIsGeneratingStory] = useState(false);
-  const [isRegeneratingTitles, setIsRegeneratingTitles] = useState(false);
   const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [selectedHistoryItem, setSelectedHistoryItem] = useState<HistoryItem | null>(null);
   const [isApiKeyModalOpen, setIsApiKeyModalOpen] = useState(false);
@@ -52,7 +51,7 @@ const App: React.FC = () => {
     if (isKeyActive) return true;
     if (window.aistudio) {
       await window.aistudio.openSelectKey();
-      setIsKeyActive(true);
+      await checkKeyStatus();
       return true;
     }
     setIsApiKeyModalOpen(true);
@@ -81,7 +80,18 @@ const App: React.FC = () => {
             if (next[index]) next[index] = { ...next[index], imageUrl: url, isLoading: false };
             return next;
           });
-          setHistoryItems(h => [{ id: Date.now().toString(), type: 'image', url, prompt: scene.imagePrompt, timestamp: Date.now() }, ...h].slice(0, 50));
+          
+          // Fix HistoryItem type inference error by explicitly typing the new item
+          setHistoryItems(h => {
+            const newItem: HistoryItem = { 
+              id: Date.now().toString(), 
+              type: 'image', 
+              url, 
+              prompt: scene.imagePrompt, 
+              timestamp: Date.now() 
+            };
+            return [newItem, ...h].slice(0, 50);
+          });
         } catch (e) {
           console.error(e);
           setScenes(prev => {
@@ -91,8 +101,12 @@ const App: React.FC = () => {
           });
         }
       });
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
+      if (e.message?.includes("entity was not found")) {
+        setIsKeyActive(false);
+        setIsApiKeyModalOpen(true);
+      }
     } finally {
       setIsGenerating(false);
       setIsGeneratingStory(false);
@@ -109,7 +123,7 @@ const App: React.FC = () => {
         topic={topic} onTopicChange={setTopic}
         referenceImage={referenceImage} onImageUpload={setReferenceImage}
         onGenerate={handleGenerateStoryboard} isGenerating={isGenerating}
-        onOpenApiSettings={() => window.aistudio?.openSelectKey() || setIsApiKeyModalOpen(true)}
+        onOpenApiSettings={() => setIsApiKeyModalOpen(true)}
         apiKeySet={isKeyActive} onMagicPromptUpdate={setMagicPrompt}
       />
       <ResultGrid 
@@ -127,7 +141,12 @@ const App: React.FC = () => {
         onSetAsReference={setReferenceImage}
       />
       <HistoryPanel items={historyItems} onSelectItem={setSelectedHistoryItem} onClear={() => setHistoryItems([])} />
-      <ApiKeyModal isOpen={isApiKeyModalOpen} onClose={() => setIsApiKeyModalOpen(false)} onKeyUpdated={checkKeyStatus} />
+      <ApiKeyModal 
+        isOpen={isApiKeyModalOpen} 
+        onClose={() => setIsApiKeyModalOpen(false)} 
+        onKeyUpdated={checkKeyStatus}
+        isKeyActive={isKeyActive}
+      />
       <ImageOverlay item={selectedHistoryItem} onClose={() => setSelectedHistoryItem(null)} />
     </div>
   );
